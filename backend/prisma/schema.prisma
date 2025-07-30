@@ -1,0 +1,79 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Property {
+  id        String   @id @default(uuid())
+  name      String
+  address   String
+  city      String
+  state     String
+  zipCode   String
+  country   String?
+  units     Unit[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Unit {
+  id         String   @id @default(uuid())
+  unitNumber String
+  property   Property @relation(fields: [propertyId], references: [id])
+  propertyId String
+  tenants    TenantUnit[] // Many-to-Many via join table
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([propertyId, unitNumber]) // Ensure unique unit numbers per property
+}
+
+model Tenant {
+  id        String       @id @default(uuid())
+  firstName String
+  lastName  String
+  email     String?      @unique
+  phone     String?
+  units     TenantUnit[] // Many-to-Many via join table
+  leases    Lease[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+// Join table for Tenant <-> Unit Many-to-Many relationship
+model TenantUnit {
+  id       String   @id @default(uuid())
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId String
+  unit     Unit     @relation(fields: [unitId], references: [id])
+  unitId   String
+  lease    Lease?   @relation(fields: [leaseId], references: [id]) // Optional link to specific lease
+  leaseId  String?
+
+  @@unique([tenantId, unitId])
+  @@index([leaseId])
+}
+
+model Lease {
+  id             String       @id @default(uuid())
+  startDate      DateTime
+  endDate        DateTime?
+  monthlyRent    Float
+  tenantUnits    TenantUnit[] // Link to the specific tenant-unit associations
+  status         LeaseStatus  @default(ACTIVE)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+enum LeaseStatus {
+  ACTIVE
+  EXPIRED
+  TERMINATED
+}
