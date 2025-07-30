@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    container_name: pm_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: pm_user
+      POSTGRES_PASSWORD: pm_password
+      POSTGRES_DB: property_manager_dev
+    ports:
+      - '5432:5432' # Expose DB port locally for tools like Prisma Studio
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pm_user"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev # Use a dev Dockerfile for hot-reloading
+    container_name: pm_api
+    restart: always
+    ports:
+      - '3001:3001' # Assuming your API runs on port 3001
+    environment:
+      DATABASE_URL: postgresql://pm_user:pm_password@db:5432/property_manager_dev
+      NODE_ENV: development
+      PORT: 3001
+    volumes:
+      - ./backend:/app # Mount source code for hot-reloading
+      - /app/node_modules # Prevent overwriting node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+    command: npm run dev # Or your dev script for hot-reloading
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev # Use a dev Dockerfile for hot-reloading
+    container_name: pm_frontend
+    restart: always
+    ports:
+      - '3000:3000' # Vite default dev server port
+    volumes:
+      - ./frontend:/app # Mount source code for hot-reloading
+      - /app/node_modules # Prevent overwriting node_modules
+    environment:
+      VITE_API_URL: http://localhost:3001/api # URL for frontend to reach API
+    depends_on:
+      - api # Ensure API is up before frontend tries to connect
+
+volumes:
+  postgres_data:
